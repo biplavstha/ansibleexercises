@@ -1,0 +1,120 @@
+-
+  name: Deploy Ecommerce Website
+  hosts: all
+  tasks:
+  - name: Install firewalld
+    yum:
+      name: '{{item}}'
+      state: present
+    become: yes
+    with_items:
+      - firewalld
+      - python3-pip
+  - name: Start and enable firewalld
+    service:
+      name: firewalld
+      state: started
+      enabled: yes
+    become: yes
+  - name: install pymysql
+    pip:
+      name: PyMySQL
+    become: yes
+-
+  name: Setup DB server
+  hosts: dbserver
+  tasks:
+    - name: Install Mariadb
+      yum:
+        name: mariadb-server
+        state: present
+      become: yes
+    - name: Start and enable Mariadb server
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+      become: yes
+    - name: Add firewall rule
+      firewalld:
+        port: 3306/tcp
+        permanent: true
+        state: enabled
+      become: yes
+    - name: Reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+      become: yes
+    - name: Configure mysql - create db
+      community.mysql.mysql_db:
+        name: ecomdb
+        state: present
+        login_user: root
+        login_password: ''
+    - name: Configure mysql - create user and grant privileges
+      community.mysql.mysql_user:
+        name: ecomuser
+        password: ecompassword
+        host: '%'
+        priv: '*.*:ALL'
+        state: present
+        login_user: root
+        login_password: ''
+    - name: Configure mysql - flush privileges
+      community.mysql.mysql_query:
+        login_db: ecomdb
+        query: FLUSH privileges
+        login_user: root
+        login_password: ''
+-
+  name: Deploy and Configure webserver
+  hosts: webserver
+  tasks:
+    - name: Install Packages php httpd and php-mysql
+      yum:
+        name: '{{item}}'
+        state: present
+      become: yes
+      with_items:
+        - httpd
+        - php
+        - php-mysqlnd
+        - mysql
+        - git
+    - name: Add firewall rule for httpd
+      firewalld:
+        port: 80/tcp
+        permanent: true
+        state: enabled
+      become: yes
+    - name: Reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+      become: yes
+    - name: Configure httpd.Conf
+      command: sed 's/index.html/index.php/g' /etc/httpd/conf/httpd.conf
+      become: yes
+    - name: Start and enable httpd
+      service: name=httpd state=started enabled=yes
+      become: yes
+    - name: Enable httpd network db connection
+      command: setsebool -P httpd_can_network_connect_db 1
+      become: yes
+    - name: Clone git directory
+      git:
+        repo: https://github.com/kodekloudhub/learning-app-ecommerce.git
+        dest: /var/www/html
+      become: yes
+    - name: Update Login information in code
+      command:  sed -i "s/'172.20.1.101'/'192.168.1.74'/" /var/www/html/index.php
+      become: yes
+    - name: populate ecomdb
+      community.mysql.mysql_db:
+        name: ecomdb
+        state: import
+        target: /var/www/html/assets/db-load-script.sql
+        login_host: '192.168.1.74'
+        login_user: ecomuser
+        login_password: ecompassword
