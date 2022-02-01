@@ -1,0 +1,47 @@
+  - name: Install MySQL
+    apt: name=mysql-server state=present
+    become: yes
+
+  - name: Install MySQL
+    apt: name=mysql-client state=present
+    become: yes
+
+  - name: Start and Enable mysql service
+    service: name=mysql state=started enabled=yes
+    become: yes
+
+  - name: install pymysql
+    pip:
+      name: PyMySQL
+      # executable: pip3
+    become: yes
+
+  # This was run only once when setting up the server
+  - name: create root user password
+    mysql_user:
+      name: 'root'
+      password: "{{ db_password }}"
+      priv: '*.*:ALL,GRANT'
+      host: 'localhost'
+      login_unix_socket: /var/run/mysqld/mysqld.sock
+      state: present
+    become: yes
+
+  - name: create database
+    mysql_db:
+      name: '{{ db_name }}'
+      state: present
+      login_user: 'root'
+      login_password: '{{ db_password }}'
+    become: yes
+
+  - name: create db user
+    mysql_user:
+      name: '{{ db_user }}'
+      password: '{{ db_password }}'
+      host: '%'
+      priv: '*.*:All'
+      state: present
+      login_user: 'root'
+      login_password: '{{ db_password }}'
+    become: yes
