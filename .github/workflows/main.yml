@@ -29,7 +29,7 @@ jobs:
       - name: cd and create vault password file
         run: |
           cd vaultpractice
-          cat ${{ secretes.VAULTPASS }} > vaultpass.txt
+          cat ${{ secrets.VAULTPASS }} > vaultpass.txt
           ansible-playbook pingplaybook.yml -i inventory.txt --vault-password-file vaultpass.txt
 
       # Runs a set of commands using the runners shell
